@@ -4,6 +4,8 @@ An interactive study site for the course script **"Machine Learning with Scikit-
 
 **Live site:** https://ofurkancoban.github.io/sklearn-exam-lab/
 
+**Exam script (PDF):** [assets/ML_with_sklearn_script.pdf](assets/ML_with_sklearn_script.pdf)
+
 ## What is inside
 
 | Section | Interactive model |
@@ -53,6 +55,7 @@ Then open http://localhost:8765. An internet connection is needed for three.js, 
 ## Project structure
 
 ```
+assets/               the short exam script (PDF)
 index.html            page shell, navigation, script includes
 css/style.css         design tokens (light and dark), layout, components
 js/core.js            helpers: Three.js stage, 2D plots, UI controls, math
@@ -71,4 +74,4 @@ Plain HTML, CSS and JavaScript, [three.js](https://threejs.org/) r147 for 3D, [M
 
 ## Note
 
-This is an unofficial study aid. The course PDFs are not included in this repository.
+This is an unofficial study aid. The short exam script by Oliver Kramer is included in `assets/` for reference; all rights to it remain with its author. The long version of the lecture notes is not included.

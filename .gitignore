@@ -3,3 +3,5 @@
 
 # OS files
 .DS_Store
+# The short exam script is published on purpose
+!assets/ML_with_sklearn_script.pdf
