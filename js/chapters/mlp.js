@@ -282,6 +282,7 @@ print("MLP accuracy:", accuracy_score(y_test, predictions))`, `MLP accuracy: 0.9
       trainBtn.textContent = "Train 300 iterations";
       net = new ML.MLP([4, ...N.arch, 3], 42);
       layout(); build(); paint(); record(); drawCurve();
+      if (ns.ok) { ns.minHalfWidth = ((N.arch.length + 1) / 2) * 3 + 1.5; ns.resize(); }
     }
     function record() {
       N.hist.push({ ep: N.epoch, tr: net.loss(Xt, yt), va: net.loss(Xv, yv) });

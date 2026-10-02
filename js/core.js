@@ -347,6 +347,13 @@ ML.Stage3D = class {
     // Narrow (phone) stages: widen the field of view so the whole scene stays in frame.
     this.camera.fov = w / h < 1.2 ? Math.min(75, this.baseFov * Math.pow(1.2 / (w / h), 0.75)) : this.baseFov;
     this.camera.updateProjectionMatrix();
+    // Optional: keep a minimum horizontal half-width in view by moving the camera back.
+    if (this.minHalfWidth) {
+      const hfov = 2 * Math.atan(Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.aspect);
+      const need = this.minHalfWidth / Math.tan(hfov / 2);
+      const dir = this.camera.position.clone().sub(this.controls.target);
+      if (dir.length() < need) this.camera.position.copy(this.controls.target).add(dir.setLength(need));
+    }
   }
   onFrame(f) { this.frameFns.push(f); }
   add(o) { this.scene.add(o); return o; }
