@@ -1,0 +1,5 @@
+# Course materials are not part of the repository
+*.pdf
+
+# OS files
+.DS_Store

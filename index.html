@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scikit-Learn Exam Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="css/style.css?v=2">
+<script>
+  // Apply a saved theme before first paint.
+  try { const t = localStorage.getItem("mlsite-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  window.MathJax = {
+    tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+    svg: { fontCache: "global" },
+    startup: { typeset: false, ready: () => { MathJax.startup.defaultReady(); MathJax.startup.promise.then(() => window.ML && ML.onMathReady && ML.onMathReady()); } },
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <button class="menu-btn" id="menu-btn" type="button" aria-controls="rail" aria-expanded="false">Sections</button>
+    <div class="brand-mark">sklearn<span>.</span>lab</div>
+  </header>
+  <nav class="rail" id="rail" aria-label="Sections">
+    <div class="brand">
+      <div class="brand-mark">sklearn<span>.</span>lab</div>
+      <div class="brand-sub">Exam prep for "Machine Learning with Scikit-Learn" (O. Kramer)</div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Studied</span><span id="progress-text" class="num">0 / 0</span></div>
+      <div class="progress-bar"><i id="progress-fill"></i></div>
+    </div>
+    <div class="search-wrap">
+      <input type="search" id="search" placeholder="Search  ( / )" aria-label="Search all sections" autocomplete="off">
+      <div class="search-results" id="search-results" hidden></div>
+    </div>
+    <div id="nav"></div>
+    <div class="rail-foot" role="group" aria-label="Theme">
+      <button class="theme-btn" type="button" data-theme-set="system">Auto</button>
+      <button class="theme-btn" type="button" data-theme-set="light">Light</button>
+      <button class="theme-btn" type="button" data-theme-set="dark">Dark</button>
+      <button class="theme-btn" type="button" id="kb-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+    </div>
+  </nav>
+  <main class="main" id="main" tabindex="-1"></main>
+</div>
+<div class="kb-help" id="kb-help" hidden role="dialog" aria-modal="true" aria-labelledby="kb-title">
+  <div class="kb-card">
+    <h3 id="kb-title">Keyboard shortcuts</h3>
+    <table><tbody>
+      <tr><td><kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Search all sections</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd> or <kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next section</td></tr>
+      <tr><td><kbd>m</kbd></td><td>Mark the section as studied</td></tr>
+      <tr><td><kbd>g</kbd></td><td>Go to Exam practice</td></tr>
+      <tr><td><kbd>?</kbd></td><td>Show this list</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+    </tbody></table>
+    <button type="button" class="btn">Close</button>
+  </div>
+</div>
+
+<script src="js/core.js?v=2"></script>
+<script src="js/data.js?v=2"></script>
+<script src="js/exercises.js?v=2"></script>
+<script src="js/chapters/overview.js?v=2"></script>
+<script src="js/chapters/knn.js?v=2"></script>
+<script src="js/chapters/svm.js?v=2"></script>
+<script src="js/chapters/forest.js?v=2"></script>
+<script src="js/chapters/metrics.js?v=2"></script>
+<script src="js/chapters/linreg.js?v=2"></script>
+<script src="js/chapters/lasso.js?v=2"></script>
+<script src="js/chapters/poly.js?v=2"></script>
+<script src="js/chapters/mlp.js?v=2"></script>
+<script src="js/chapters/dbscan.js?v=2"></script>
+<script src="js/chapters/pca.js?v=2"></script>
+<script src="js/chapters/mds.js?v=2"></script>
+<script src="js/chapters/pcaclf.js?v=2"></script>
+<script src="js/chapters/cv.js?v=2"></script>
+<script src="js/chapters/reference.js?v=2"></script>
+<script src="js/chapters/extras.js?v=2"></script>
+<script src="js/quiz.js?v=2"></script>
+<script src="js/questions2.js?v=2"></script>
+<script src="js/practice.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
+</body>
+</html>
