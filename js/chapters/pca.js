@@ -70,7 +70,7 @@ plt.show()`, "")}
     const host = root.querySelector("#pc-stage"), panel = root.querySelector("#pc-panel");
     const st = new ML.Stage3D(host, { cam: [6.2, 4.6, 6.8], target: [0.4, 1, 0] });
     disposers.push(() => st.dispose());
-    const S = { center: 0, dirs: 0, proj: 0 };
+    const S = { center: 0, dirs: 0, proj: 0, ndirs: 3 };
     let sph, arrows = new THREE.Group(), sticks = new THREE.Group(), planeM, muMark;
     const cur = (i) => {
       const x = raw[i];
@@ -129,11 +129,12 @@ plt.show()`, "")}
       if (S.dirs) {
         const cols = [col.c[1], col.warn, col.muted];
         P.vectors.forEach((v, k) => {
+          if (k >= S.ndirs) return;
           const len = Math.sqrt(P.values[k]) * 2.2 + 0.15;
           const dir = ML.P(...v).normalize();
-          const a = new THREE.ArrowHelper(dir, ML.P(...mu), len, new THREE.Color(cols[k]).getHex(), 0.22, 0.12);
+          const a = ML.arrow(ML.P(...mu), ML.P(...mu).add(dir.clone().multiplyScalar(len)), cols[k], 0.26, 0.035);
           arrows.add(a);
-          const lb = ML.label(`PC${k + 1}`, { h: 0.24, color: cols[k] });
+          const lb = ML.label(`PC${k + 1}`, { h: 0.26, color: cols[k], depthTest: false, order: 20 });
           lb.position.copy(ML.P(...mu).add(dir.clone().multiplyScalar(len + 0.25)));
           arrows.add(lb);
         });
@@ -147,6 +148,36 @@ plt.show()`, "")}
       planeM.matrix.setPosition(ML.P(...mu));
     }
     draw();
+
+    // ----- Step-by-step tour -----
+    const set = (c, d, n, p) => { cancelAnimationFrame(anim); S.dirs = d; S.ndirs = n; S.center = c; S.proj = p; draw(); };
+    const v3 = () => { const v = ML.P(...P.vectors[2]).normalize().multiplyScalar(9); return [[v.x, v.y, v.z], [0, 0, 0]]; };
+    const CAM = [[6.2, 4.6, 6.8], [0.4, 1, 0]], CAM0 = [[6.2, 4.6, 6.8], [0, 0.4, 0]];
+    const pct = (k) => `${(P.ratio[k] * 100).toFixed(1)}%`;
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "A cloud of points with three features", cam: CAM,
+        run: () => { set(0, 0, 3, 0); },
+        d: "220 examples, each with 3 features. The cloud is long in one direction, thinner in another and very flat in the third, and it sits away from the origin. PCA will describe it with fewer coordinates." },
+      { t: "1. Center the data", cam: CAM0,
+        run: (ann) => { S.dirs = 0; S.ndirs = 3; S.proj = 0; S.center = 0; tween("center", 1); if (st.ok) ML.tag(ann, "mean μ moves to 0", ML.P(0, 0, -0.6), col.bad, 0.22); },
+        d: "Subtract each feature's mean: \\(x_j - \\mu_j\\). The red diamond (the mean) slides to the origin and the whole cloud follows. Nothing about its shape changes." },
+      { t: "2a. PC1: the direction of largest spread", cam: CAM0,
+        run: () => { set(1, 1, 1, 0); },
+        d: () => `PCA searches for the unit direction along which the projected points vary most. That is <b>PC1</b> (teal arrow, length proportional to the spread). It alone captures <b>${pct(0)}</b> of the total variance.` },
+      { t: "2b. PC2: perpendicular, largest remaining spread", cam: [[-1, 7, 3], [0, 0.2, 0]],
+        run: () => { set(1, 1, 2, 0); },
+        d: () => `<b>PC2</b> (orange) is perpendicular to PC1 and follows the largest spread that is left: ${pct(1)}. PCA finds these directions from the features alone, never using class labels.` },
+      { t: "2c. PC3: what is left", cam: CAM0,
+        run: () => { set(1, 1, 3, 0); },
+        d: () => `PC3 (grey) is perpendicular to both and carries only <b>${pct(2)}</b> of the variance: the cloud is almost flat in that direction. Dropping it loses little information.` },
+      { t: "3. Project onto the PC1-PC2 plane", cam: CAM0, ms: 8000,
+        run: () => { S.dirs = 1; S.ndirs = 3; S.center = 1; S.proj = 0; tween("proj", 1); },
+        d: "Every point drops straight onto the plane spanned by PC1 and PC2 (blue). The grey sticks are the parts along PC3 that are thrown away: the information PCA loses." },
+      { t: "The new 2D coordinates", cam: v3,
+        run: () => { S.dirs = 1; S.ndirs = 2; S.center = 1; S.proj = 1; draw(); },
+        d: () => `Looking straight at the plane, each point now has two coordinates \\(z = \\sum_j v_j(x_j - \\mu_j)\\), one per direction. Kept: <b>${((P.ratio[0] + P.ratio[1]) * 100).toFixed(1)}%</b> of the variance. This is what <code>PCA(n_components=2).fit_transform(X)</code> returns; the Iris plot below is the same idea with 4 features.` },
+    ], { title: "How PCA reduces dimensions" });
+    disposers.push(() => tour.dispose());
 
     // Iris PCA on all four standardized features.
     const D = ML.data.iris, sc = ML.scaler(D.X), Xs = sc.transform(D.X), IP = ML.pca(Xs);

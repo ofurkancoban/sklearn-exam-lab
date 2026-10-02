@@ -8,6 +8,8 @@ An interactive study site for the course script **"Machine Learning with Scikit-
 
 ## What is inside
 
+Every 3D model comes with a **step-by-step tour**: the camera flies to the relevant part of the scene, the settings change for each step, key points are labeled in 3D, and a short explanation with live numbers sits above the scene. Step through with Next / Back, jump with the progress bar, or use Auto-play. "Explore freely" hands the controls back to you.
+
 | Section | Interactive model |
 | --- | --- |
 | The basic idea | Iris in 3D, supervised vs. unsupervised view, X / y notation table |

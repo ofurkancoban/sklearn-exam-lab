@@ -165,6 +165,33 @@ weighted avg       0.90      0.90      0.90        30`)}
     disposers.push(() => cancelAnimationFrame(anim));
     draw();
 
+    // ----- Step-by-step tour: why scaling matters -----
+    const sdrv = ML.drive(panel);
+    const sameTxt = () => panel.querySelectorAll(".stat b")[1].textContent;
+    const shareTxt = () => panel.querySelectorAll(".stat b")[0].textContent;
+    const qpos = () => (st.ok && sph.pos[q] ? sph.pos[q].clone() : new THREE.Vector3());
+    const scTour = ML.tour(host.parentElement, st, [
+      { t: "Three features on their true scale", cam: [[6, 4.6, 6.8], [0, 1, 0]],
+        run: (ann) => { sdrv.seg("Raw units"); if (st.ok) ML.tag(ann, "income: 0 to 10,000", ML.P(0.4, 2.6, 1.6), col.ink, 0.22); },
+        d: "80 customers with a ratio (0 to 1), an income (0 to 10,000) and an age (18 to 80), drawn with the <b>same scale on every axis</b>, exactly how a distance formula sees them. The cloud collapses into a thin line along the income axis." },
+      { t: "Ratio and age almost disappear", cam: [[0.01, 1.5, 6.5], [0, 1.4, 0]],
+        run: (ann) => { sdrv.seg("Raw units"); if (st.ok) ML.tag(ann, "ratio and age differences: tiny", ML.P(0, 0, 1.9), col.bad, 0.18); },
+        d: "Looking along the income axis, all customers sit almost on one point: a difference of 0.5 in ratio or 30 years in age is nothing next to a difference of 3,000 in income. In <b>squared</b> distances the gap is even larger." },
+      { t: "Nearest neighbors in raw units", cam: () => { const p = qpos(); return [[p.x + 2.4, p.y + 1.8, p.z + 2.6], [p.x, p.y, p.z]]; },
+        run: () => { sdrv.seg("Raw units"); },
+        d: () => `The large ringed customer and its 5 nearest neighbors (lines). Income makes up <b>${shareTxt()}</b> of their squared distance, so the neighbors are simply people with similar income. Only ${sameTxt()} belong to the same group (color).` },
+      { t: "Standardize: x′ = (x − μ) / σ", cam: [[6, 4.6, 6.8], [0, 1, 0]], ms: 8000,
+        run: () => { sdrv.seg("Standardized"); },
+        d: "Each feature is shifted by its training mean μ and divided by its training standard deviation σ. Watch the cloud open up: afterwards every feature has <b>mean 0 and standard deviation 1</b>, so all three span a similar range." },
+      { t: "Nearest neighbors after scaling", cam: () => { const p = qpos(); return [[p.x + 2.4, p.y + 1.8, p.z + 2.6], [p.x, p.y, p.z]]; },
+        run: () => { sdrv.seg("Standardized"); },
+        d: () => `Now all features shape the distance (income's share drops to ${shareTxt()}) and ${sameTxt()} neighbors come from the same group. This is why KNN, SVM, MLP, Lasso and DBSCAN need scaling.` },
+      { t: "Learn μ and σ from training data only", cam: [[6, 4.6, 6.8], [0, 1, 0]],
+        run: () => { sdrv.seg("Standardized"); },
+        d: "In a real model, μ and σ must come from the <b>training rows only</b>: put StandardScaler inside the pipeline. Fitting it on all data before splitting leaks test information into training. Standardized data is not automatically normally distributed." },
+    ], { title: "Why scaling changes the neighbors" });
+    disposers.push(() => scTour.dispose());
+
     // Standardization calculator.
     const cbox = root.querySelector("#sc-calc"), cout = root.querySelector("#sc-out");
     const cs = { mu: 10, sd: 2, x: 14 };

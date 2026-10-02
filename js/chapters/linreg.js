@@ -156,6 +156,47 @@ R2: 0.4526027629719196`)}
       sph.commit();
     }
     upd();
+
+    // ----- Step-by-step tour -----
+    const drv = ML.drive(panel);
+    const ybar = ML.mean(y);
+    const met = (b, w1, w2) => {
+      const e = y.map((v, i) => v - (b + w1 * X[i][0] + w2 * X[i][1]));
+      const sse = e.reduce((a, v) => a + v * v, 0), sst = y.reduce((a, v) => a + (v - ybar) ** 2, 0);
+      return { e, mse: sse / n, mae: ML.mean(e.map(Math.abs)), sse, sst, r2: 1 - sse / sst };
+    };
+    const showModel = (on) => { if (st.ok) { plane.visible = on; res.visible = on; } };
+    const fit1 = ML.lstsq(X.map((x) => [1, x[0]]), y);
+    const CAM3 = [[6.4, 4.2, 7], [0, 1.6, 0]];
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "The data: 40 houses in 3D", cam: CAM3,
+        run: () => { drv.check("Show squared", false); showModel(false); return () => showModel(true); },
+        d: "Each sphere is one house. Its position on the floor is given by two features (x1: house size, x2: outside temperature, both scaled); its <b>height is the target y</b>, the energy used. Regression must predict this height from the floor position." },
+      { t: "Simplest guess: always predict the mean", cam: CAM3,
+        run: () => { showModel(true); tween([ybar, 0, 0]); },
+        d: () => `With all weights 0 the model is a flat plane at the mean ȳ = ${ybar.toFixed(2)}. The vertical sticks are the errors e<sub>i</sub> = y<sub>i</sub> − ŷ<sub>i</sub> (teal: house above the plane, orange: below). Here Σ(y − ŷ)² equals Σ(y − ȳ)², so <b>R² = 0</b>.` },
+      { t: "Add one weight: ŷ = b + w1·x1", cam: [[0.01, 1.6, 9], [0, 1.6, 0]],
+        run: () => { showModel(true); tween([fit1[0], fit1[1], 0]); },
+        d: () => { const m = met(fit1[0], fit1[1], 0); return `Seen from the front, the plane now tilts along x1: bigger houses use more energy (w1 = ${fit1[1].toFixed(2)}). With one feature the model is a straight line. MSE drops to ${m.mse.toFixed(2)} and R² rises to ${m.r2.toFixed(2)}.`; } },
+      { t: "Add the second weight: a tilted plane", cam: CAM3,
+        run: () => { showModel(true); tween(ols); },
+        d: () => { const m = met(...ols); return `With both features \\(\\hat y = b + w_1x_1 + w_2x_2\\) is a plane: b = ${ols[0].toFixed(2)} sets its height, w1 = ${ols[1].toFixed(2)} and w2 = ${ols[2].toFixed(2)} its slopes. Warmer weather lowers energy use, so w2 is negative. R² = <b>${m.r2.toFixed(3)}</b>.`; } },
+      { t: "Every error is a vertical distance", cam: () => { const m = met(...ols); let k = 0; m.e.forEach((v, i) => { if (Math.abs(v) > Math.abs(m.e[k])) k = i; }); const p = ML.P(X[k][0], X[k][1], y[k]); return [[p.x + 2.2, p.y + 0.8, p.z + 2.4], [p.x, p.y, p.z]]; },
+        run: (ann) => {
+          showModel(true); tween(ols);
+          if (!st.ok) return;
+          const m = met(...ols); let k = 0; m.e.forEach((v, i) => { if (Math.abs(v) > Math.abs(m.e[k])) k = i; });
+          ML.tag(ann, `e = y − ŷ = ${m.e[k].toFixed(2)}`, ML.P(X[k][0], X[k][1], y[k] + 0.45), col.ink, 0.22);
+        },
+        d: "The largest error of the fitted plane: the true value minus the prediction, measured straight up or down. <b>MAE</b> averages |e<sub>i</sub>|, <b>MSE</b> averages e<sub>i</sub>², <b>RMSE</b> = √MSE. MAE and RMSE are in the target's units." },
+      { t: "MSE is literally an average of squares", cam: [[0.01, 2, 9.5], [0, 1.6, 0]],
+        run: () => { showModel(true); tween(ols); drv.check("Show squared", true); return () => drv.check("Show squared", false); },
+        d: () => { const m = met(...ols); return `Each error now has a square with side |e<sub>i</sub>|. MSE is the average area of these squares: <b>${m.mse.toFixed(3)}</b>. A large error makes a much larger square, which is why RMSE reacts more strongly to big errors than MAE (${Math.sqrt(m.mse).toFixed(3)} vs ${m.mae.toFixed(3)}).`; } },
+      { t: "Least squares: the smallest total area", cam: CAM3,
+        run: () => { showModel(true); drv.check("Show squared", false); tween(ols); },
+        d: () => { const m = met(...ols); return `Training picks b, w1, w2 so that the total squared error is as small as possible. No other plane does better here. R² = 1 − ${m.sse.toFixed(1)} / ${m.sst.toFixed(1)} = <b>${m.r2.toFixed(3)}</b>. Now move the sliders yourself: any change makes the squares bigger.`; } },
+    ], { title: "How linear regression fits a plane" });
+    disposers.push(() => tour.dispose());
     return disposers;
   },
 });

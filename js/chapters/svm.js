@@ -340,6 +340,84 @@ print("SVM accuracy:", accuracy_score(y_test, predictions))`, `SVM accuracy: 0.9
     lpanel.append(ML.el("div", { class: "verdict", html: "At 0% no straight line separates the rings. At 100% the inner ring sits low and the outer ring high, so the <b>flat blue plane</b> splits them. Its trace on the floor is the black circle." }));
     disposers.push(() => cancelAnimationFrame(animId));
     drawLift();
+
+    // ----- Step-by-step tour: main landscape -----
+    const drv = ML.drive(panel);
+    // Line children alternate: contour on the surface (even index), contour on the floor (odd index).
+    const vis = (surfOn, linesOn, ringsOn, floorOn) => { if (!st.ok) return; surf.visible = surfOn; lines.visible = linesOn; lines.children.forEach((c, i) => (c.visible = surfOn || i % 2 === 1)); rings.visible = ringsOn; floorTex.mesh.visible = floorOn; };
+    const all = () => vis(true, true, true, true);
+    const TOP = [[0, 8.6, 0.01], [0, FLOOR, 0]], CAM3 = [[0.4, 6.4, 8.2], [0, -0.4, 0]], SIDE = [[7.5, 0.4, 0.01], [0, -0.2, 0]];
+    const linear = (ds, C) => { drv.seg(ds); drv.seg("linear"); drv.slider("C (violation", C); };
+    const bpoint = () => { const w = model.w, n2 = w[0] ** 2 + w[1] ** 2; return [-model.b * w[0] / n2, -model.b * w[1] / n2]; };
+    const svmTour = ML.tour(host.parentElement, st, [
+      { t: "Two classes, labeled −1 and +1", cam: TOP,
+        run: () => { linear("Separable", 1000); vis(false, false, false, false); return all; },
+        d: "Each point is a training example with two features (x1, x2). Purple points have label <b>−1</b>, yellow points <b>+1</b>. The goal: a line that separates them and also works for new points." },
+      { t: "Many lines separate the classes", cam: TOP,
+        run: (ann) => {
+          vis(false, false, false, false);
+          linear("Separable", 1000); vis(false, false, false, false);
+          if (st.ok && model.w) {
+            const c = bpoint(), base = Math.atan2(model.w[0], -model.w[1]);
+            [[-0.22, -0.15], [0.18, 0.12], [0.05, -0.3]].forEach(([da, sh], k) => {
+              const a = base + da, dir = [Math.cos(a), Math.sin(a)], nrm = [-dir[1], dir[0]], p = [];
+              for (let t = -3.4; t <= 3.4; t += 0.05) { const x = c[0] + sh * nrm[0] + t * dir[0], y = c[1] + sh * nrm[1] + t * dir[1]; if (Math.abs(x) < 2.4 && Math.abs(y) < 2.4) p.push(ML.P(x, y, FLOOR + 0.02)); }
+              if (p.length > 1) ann.add(ML.line(p, new THREE.Color([col.warn, col.c[1], col.bad][k]), { dashed: true }));
+            });
+          }
+          return all;
+        },
+        d: "All three dashed lines classify every training point correctly. Which one is best for new points? The SVM answers: the line with the <b>widest margin</b>, the one that stays as far as possible from the closest points of both classes." },
+      { t: "The decision function f(x) as a surface", cam: CAM3,
+        run: () => { linear("Separable", 1000); vis(true, false, false, false); return all; },
+        d: "The SVM computes a score \\(f(x) = w^\\top x + b\\) for every point. Here the score is drawn as <b>height</b>: for a linear SVM it is a tilted plane. Above the zero level the prediction is +1, below it −1: \\(\\hat{y} = \\operatorname{sign}(f(x))\\)." },
+      { t: "The boundary is where f(x) = 0", cam: SIDE,
+        run: (ann) => { linear("Separable", 1000); vis(true, true, false, true); if (st.ok) { const c = bpoint(); ML.tag(ann, "f(x) = 0: boundary", ML.P(c[0], c[1], 0.25), col.ink); } return all; },
+        d: "Seen from the side: the plane crosses the zero level along a straight line, the <b>decision boundary</b> (solid line, also drawn on the floor). The weights w set its orientation, b shifts it." },
+      { t: "Margin lines f(x) = ±1 and the margin width", cam: TOP,
+        run: (ann) => {
+          linear("Separable", 1000); vis(false, true, true, true);
+          if (st.ok && model.w) {
+            const w = model.w, n2 = w[0] ** 2 + w[1] ** 2, c = bpoint();
+            const a = ML.P(c[0] - w[0] / n2, c[1] - w[1] / n2, FLOOR + 0.05), b = ML.P(c[0] + w[0] / n2, c[1] + w[1] / n2, FLOOR + 0.05);
+            ann.add(ML.arrow(a, b, col.bad, 0.15)); ann.add(ML.arrow(b, a, col.bad, 0.15));
+            ML.tag(ann, `2/‖w‖ = ${(2 / Math.sqrt(n2)).toFixed(2)}`, ML.P(c[0], c[1], FLOOR + 0.4), col.bad);
+          }
+          return all;
+        },
+        d: () => model.w ? `The dashed lines are where f(x) = −1 and f(x) = +1. Their distance is the <b>margin width 2/‖w‖</b> = 2/${Math.hypot(...model.w).toFixed(2)} = <b>${(2 / Math.hypot(...model.w)).toFixed(2)}</b>. Training minimizes ½‖w‖² while keeping every point on its correct side: a smaller ‖w‖ means a wider margin (hard margin, Eq. 4).` : "" },
+      { t: "Support vectors hold the boundary", cam: TOP,
+        run: () => { linear("Separable", 1000); vis(false, true, true, true); return all; },
+        d: () => `Only the ringed points touch the margin lines: the <b>${model.sv.length} support vectors</b>. Remove or move any other point (without crossing a margin line) and the boundary stays exactly the same.` },
+      { t: "Overlapping data needs a soft margin", cam: TOP,
+        run: () => { linear("Overlap", 1); vis(false, true, true, true); return all; },
+        d: () => `Now the classes overlap, so no line separates them perfectly and the hard margin has no solution. Slack variables ξ<sub>i</sub> allow violations; C sets their cost. With C = 1: ${root.querySelector("#svm-x1").textContent} points inside the margin (0 &lt; ξ &lt; 1) and ${root.querySelector("#svm-x2").textContent} misclassified (ξ &gt; 1). Larger points on the floor are misclassified.` },
+      { t: "Small C: wide, tolerant margin", cam: TOP,
+        run: () => { linear("Overlap", 0.03); vis(false, true, true, true); return all; },
+        d: () => `With C = 0.03, violations are cheap: the margin becomes very wide and <b>${model.sv.length}</b> points become support vectors. Large C does the opposite (narrow margin, fits the training points more closely). Neither is always better: choose C by validation.` },
+      { t: "Curved data: the RBF kernel", cam: CAM3,
+        run: () => { drv.seg("Moons"); drv.seg("rbf"); drv.slider("C (violation", 10); drv.slider("gamma", 1); all(); },
+        d: "Two interleaved moons cannot be split by a straight line. With the <b>RBF kernel</b> \\(K(x,z) = \\exp(-\\gamma\\lVert x - z\\rVert^2)\\), f(x) becomes a landscape of hills and valleys, and its zero level is a curved boundary." },
+      { t: "Too large γ: every point gets its own hill", cam: CAM3,
+        run: () => { drv.seg("Moons"); drv.seg("rbf"); drv.slider("C (violation", 10); drv.slider("gamma", 20); all(); },
+        d: "With γ = 20, similarity drops off very quickly, so each training point only influences its tiny neighborhood. The surface wraps around single points: a sign of <b>overfitting</b>. Typical practice: tune C and γ together with cross-validation." },
+    ], { title: "How an SVM finds its boundary" });
+    disposers.push(() => svmTour.dispose());
+
+    // ----- Step-by-step tour: kernel lift -----
+    const ldrv = ML.drive(lpanel);
+    const liftTour = ML.tour(lhost.parentElement, ls, [
+      { t: "Rings in the original plane", cam: [[0, 6.5, 0.01], [0, 0, 0]], run: () => { ldrv.slider("Lift amount", 0); },
+        d: "One class forms a ring around the other. In the original two features no straight line can separate them." },
+      { t: "Add a third feature: x1² + x2²", cam: [[4.6, 3.2, 5.2], [0, 0.8, 0]], camMs: 900,
+        run: () => { let t0 = null, raf; const go = (t) => { if (t0 === null) t0 = t; const k = Math.min(1, (t - t0) / 1600); ldrv.slider("Lift amount", +ML.ease(k).toFixed(2)); if (k < 1) raf = requestAnimationFrame(go); }; raf = requestAnimationFrame(go); return () => cancelAnimationFrame(raf); },
+        d: "Each point is lifted by its squared distance from the center. Inner points stay low, outer points rise high." },
+      { t: "A flat plane now separates them", cam: [[6, 0.9, 0.01], [0, 0.8, 0]], run: () => { ldrv.slider("Lift amount", 1); },
+        d: "From the side it is obvious: the flat blue plane separates low (inner) points from high (outer) points. In the lifted space the classes are <b>linearly separable</b>." },
+      { t: "Back in 2D the cut is a circle", cam: [[0, 6.5, 0.01], [0, 0, 0]], run: () => { ldrv.slider("Lift amount", 1); },
+        d: "Looking down, the plane's cut appears as the black circle: a <b>linear separator in the mapped space is a curved boundary in the original space</b>. A kernel like RBF does such a mapping implicitly, without ever computing the new coordinates." },
+    ], { title: "Why kernels give curved boundaries" });
+    disposers.push(() => liftTour.dispose());
     return disposers;
   },
 });

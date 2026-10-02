@@ -254,6 +254,42 @@ print("Forest accuracy:", accuracy_score(y_test, predictions))`, `Forest accurac
       box.innerHTML = svg + "</svg>";
     }
     fit();
+
+    // ----- Step-by-step tour -----
+    const drv = ML.drive(panel);
+    const statTxt = (i) => panel.querySelectorAll(".stat b")[i].textContent;
+    const layersVis = (n, base = true) => {
+      if (!st.ok) return;
+      layerPlanes.forEach((lp, k) => { const on = k < Math.min(n, trees.length); lp.mesh.visible = on; layerLabels[k].lab.visible = on; layerLabels[k].frame.visible = on; });
+      basePlane.mesh.visible = base; probeLine.visible = n > 0; probeDots.mesh.visible = n > 0;
+    };
+    const restore = () => layersVis(LAYERS, true);
+    const setProbe = (p) => { probe = p; updateProbe(); };
+    const LOW = [[6.2, 3.2, 7.2], [0.2, 0.4, 0]], STACK = [[7.2, 5.6, 8.4], [0.4, 1.9, 0]];
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "The training data", cam: [[0.2, 7.5, 3.2], [0, 0, 0]],
+        run: () => { drv.seg("3 blobs"); drv.slider("n_estimators", 1); drv.slider("max_depth", 6); layersVis(0, false); return restore; },
+        d: "120 training points with two features and three classes. A random forest is built from many decision trees, so we start with a single tree." },
+      { t: "One tree = a sequence of yes/no questions", cam: LOW,
+        run: (ann) => { drv.slider("n_estimators", 1); drv.slider("max_depth", 3); layersVis(1, false); if (st.ok) ML.tag(ann, "tree 1: x1 ≤ t? x2 ≤ t?", ML.P(0, 0, 0.4 + GAP + 0.35), col.ink, 0.22); return restore; },
+        d: "Tree 1 floats above the data. Each split asks one question about one feature, like <i>“is x1 ≤ 0.4?”</i>, so the regions are <b>axis-aligned rectangles</b>. With max_depth = 3, at most three questions are asked in a row. The tree diagram below the scene shows these questions." },
+      { t: "A deep single tree overfits", cam: LOW,
+        run: () => { drv.slider("n_estimators", 1); drv.slider("max_depth", 12); layersVis(1, false); return restore; },
+        d: () => `With max_depth = 12 the tree keeps splitting until almost every training point is alone in its region: small islands appear. Training accuracy is ${statTxt(2)}, but on fresh test data this single tree reaches only <b>${statTxt(0)}</b>.` },
+      { t: "Bootstrap samples make different trees", cam: STACK,
+        run: () => { drv.slider("max_depth", 6); drv.slider("n_estimators", 5); layersVis(5, false); return restore; },
+        d: "Each tree is trained on its own <b>bootstrap sample</b>: as many rows as the training set, drawn with replacement. At each split it also sees only a <b>random subset of features</b>. So the five layers disagree in their details." },
+      { t: "Ask every tree about one point", cam: STACK,
+        run: (ann) => { drv.slider("n_estimators", 5); layersVis(5, false); setProbe([-0.15, 0.45]); if (st.ok) ML.tag(ann, "probe x", ML.P(-0.15, 0.45, 0.25), col.ink, 0.22); return restore; },
+        d: () => { const ps = trees.slice(0, 5).map((t) => ML.tree.proba(t, probe)); return `The vertical line is a probe point x. Each tree gives class probabilities q<sub>t</sub>(c | x): ${ps.map((p, i) => `tree ${i + 1} → (${p.map((v) => v.toFixed(1)).join(", ")})`).join("; ")}. The dot on each layer shows that tree's favorite class.`; } },
+      { t: "Average the opinions: q̄(c | x)", cam: STACK,
+        run: () => { drv.slider("n_estimators", 5); layersVis(5, true); setProbe([-0.15, 0.45]); return restore; },
+        d: () => { const avg = [0, 0, 0]; trees.forEach((t) => ML.tree.proba(t, probe).forEach((v, c) => (avg[c] += v / trees.length))); return `The bottom layer is the forest: \\(\\bar q(c \\mid x) = \\frac{1}{T}\\sum_t q_t(c \\mid x)\\). At the probe: (${avg.map((v) => v.toFixed(2)).join(", ")}), so the forest predicts <b>class ${avg.indexOf(Math.max(...avg))}</b>, the class with the largest average probability.`; } },
+      { t: "Many trees: smoother and more stable", cam: [[0.2, 7.5, 3.2], [0, 0, 0]],
+        run: () => { drv.slider("max_depth", 12); drv.slider("n_estimators", 50); layersVis(0, true); return restore; },
+        d: () => `50 deep trees, averaged. Each tree alone overfits, but their errors partly cancel: the forest's map is smoother and on fresh test data it reaches <b>${statTxt(1)}</b> versus ${statTxt(0)} for tree 1 alone. More trees take more time and do not guarantee a better result.` },
+    ], { title: "How a random forest combines trees" });
+    disposers.push(() => tour.dispose());
     return disposers;
   },
 });

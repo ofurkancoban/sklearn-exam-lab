@@ -186,6 +186,50 @@ Noise points: 0`)}
     }
     setFrame();
     run();
+
+    // ----- Step-by-step tour -----
+    const drv = ML.drive(panel);
+    const moonsOf = (eps, m) => { drv.seg("Two moons"); drv.slider("eps", eps); drv.slider("min_samples", m); };
+    const disc = (ann, i, color) => {
+      if (!st.ok) return;
+      const X = DS[S.ds].X, d = DS[S.ds];
+      const m = new THREE.Mesh(new THREE.CircleGeometry(S.eps * d.s, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
+      m.position.copy(W(X[i])); m.position.y = 0.02; ann.add(m);
+      ann.add(ML.ring(ann, W(X[i]).setY(0.03), S.eps * d.s, color));
+      res.nb[i].forEach((j) => { if (j !== i) ann.add(ML.line([W(X[i]), W(X[j])], new THREE.Color(color), { opacity: 0.8 })); });
+    };
+    const pick = (fn) => DS[S.ds].X.findIndex((_, i) => fn(i));
+    const camAt = (i, dist = 2.2) => { const p = W(DS[S.ds].X[i]); return [[p.x + 0.2, p.y + dist * 1.3, p.z + dist], [p.x, p.y, p.z]]; };
+    let coreI = -1, borderI = -1;
+    const getCore = () => { if (coreI < 0) coreI = pick((i) => res.core[i] && res.nb[i].length >= 9); return coreI; };
+    const TOP = [[0.4, 6.4, 6.6], [0, 0.2, 0]];
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "Data without labels", cam: TOP,
+        run: () => { moonsOf(0.25, 5); S.grow = 0; paint(); return () => { S.grow = 1; paint(); }; },
+        d: "300 points from <code>make_moons</code>. Clustering is unsupervised: DBSCAN sees only the coordinates, no labels, and it is <b>not told how many groups</b> exist." },
+      { t: "Draw the ε-neighborhood of one point", cam: () => camAt(coreI),
+        run: (ann) => { moonsOf(0.25, 5); S.grow = 0; paint(); getCore(); disc(ann, coreI, col.accent); if (st.ok) ML.tag(ann, `|Nε| = ${res.nb[coreI].length}`, W(DS[S.ds].X[coreI]).add(new THREE.Vector3(0, 0.55, 0)), col.ink, 0.22); return () => { S.grow = 1; paint(); }; },
+        d: () => `The circle has radius eps = ${S.eps}. Every point inside it is a neighbor. This point has <b>${res.nb[coreI].length}</b> points in its neighborhood, counting itself.` },
+      { t: "Core point: at least min_samples neighbors", cam: () => camAt(coreI),
+        run: (ann) => { moonsOf(0.25, 5); S.grow = 0; paint(); getCore(); disc(ann, coreI, col.good); if (st.ok) ML.tag(ann, "core point", W(DS[S.ds].X[coreI]).add(new THREE.Vector3(0, 0.55, 0)), col.good, 0.22); return () => { S.grow = 1; paint(); }; },
+        d: () => `\\(|N_\\varepsilon(x_i)| = ${res.nb[coreI].length} \\ge \\texttt{min\\_samples} = ${S.minS}\\), so it is a <b>core point</b>: it sits in a dense region and may start or extend a cluster.` },
+      { t: "Clusters grow from core to core", cam: TOP, ms: 9000,
+        run: () => { moonsOf(0.25, 5); drv.btn("Animate cluster growth"); },
+        d: "Starting at a core point, DBSCAN adds all its neighbors to the cluster. Every neighbor that is itself a core point adds <i>its</i> neighbors too, and so on, until no new points are reachable. Then it starts the next cluster. Result: <b>2 clusters</b>, following the curved moons." },
+      { t: "Border points join but do not extend", cam: () => (borderI >= 0 ? camAt(borderI) : TOP),
+        run: (ann) => { moonsOf(0.25, 12); borderI = pick((i) => !res.core[i] && res.labels[i] !== -1); if (borderI >= 0) { disc(ann, borderI, col.warn); if (st.ok) ML.tag(ann, "border point", W(DS[S.ds].X[borderI]).add(new THREE.Vector3(0, 0.55, 0)), col.warn, 0.22); } },
+        d: () => borderI >= 0 ? `With min_samples = 12, this point has only ${res.nb[borderI].length} neighbors: not a core point. But it lies within eps of a core point, so it is a <b>border point</b> of that cluster (small sphere). Border points never pull further points in.` : "Border points are close to a core point but not dense enough themselves." },
+      { t: "Too small eps: fragments and noise", cam: TOP,
+        run: () => { moonsOf(0.1, 5); },
+        d: () => `eps = 0.1: most neighborhoods are too small to reach 5 points. The moons shatter into <b>${res.nClusters} clusters</b> and <b>${res.labels.filter((l) => l === -1).length}</b> points are noise (grey, label −1), exactly what scikit-learn reports in Exercise 4.` },
+      { t: "Too large eps: the moons merge", cam: TOP,
+        run: () => { moonsOf(0.5, 5); },
+        d: () => `eps = 0.5 reaches across the gap between the moons, so core points connect them into <b>${res.nClusters} cluster</b>. A good eps (0.25 here) lies between these extremes. Because eps is a distance, feature scaling matters.` },
+      { t: "Curved shapes in 3D", cam: [[4.2, 4.2, 5.4], [0, 1.2, 0]],
+        run: () => { drv.seg("3D chain"); drv.slider("eps", 0.25); drv.slider("min_samples", 5); },
+        d: () => `Two interlocked rings. No straight cut can separate them, but density follows each ring around its curve: DBSCAN finds <b>${res.nClusters}</b> clusters. Remember: it labels only the fitted data and has no predict method for new points.` },
+    ], { title: "How DBSCAN finds clusters" });
+    disposers.push(() => tour.dispose());
     return disposers;
   },
 });

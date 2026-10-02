@@ -162,6 +162,35 @@ Weights: [  0.687  -9.298  26.219  15.657  -8.228  -0.     -9.024   3.421  22.63
     }
     upd();
 
+    // ----- Step-by-step tour -----
+    const drv = ML.drive(panel);
+    const zeroAt = (j) => { const p = path.find((q) => Math.abs(q.w[j]) < 1e-9 && q.al > 0); return p ? p.al : 3.5; };
+    const a2 = zeroAt(1), a1 = zeroAt(0);
+    const wAt = (al) => path[Math.round((al / 3.5) * 140)].w;
+    const ballCam = () => { const p = ball.position; return [[p.x + 2.6, p.y + 2.6, p.z + 2.8], [p.x, p.y, p.z]]; };
+    const CAM3 = [[6.2, 5.4, 7.2], [0, 0.5, 0]];
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "Every point on the floor is one model", cam: CAM3,
+        run: () => { drv.slider("alpha", 0); },
+        d: "The floor shows all possible pairs of weights (w1, w2) for two standardized features. The height above each pair is the training objective: how bad that model is. Training means finding the <b>lowest point</b>." },
+      { t: "α = 0: a smooth bowl (linear regression)", cam: ballCam,
+        run: () => { drv.slider("alpha", 0); },
+        d: () => `Without a penalty the objective is half the training MSE, a smooth bowl. Its lowest point (ball inside the black ring) is the ordinary least-squares solution: w1 = ${path[0].w[0].toFixed(2)}, w2 = ${path[0].w[1].toFixed(2)}. Feature 1 is strong, feature 2 is weak.` },
+      { t: "Adding the penalty α Σ|wⱼ|", cam: [[0.01, 9, 0.6], [0, 0, 0]],
+        run: () => { drv.slider("alpha", 0.5); },
+        d: () => `The L1 penalty \\(\\alpha(|w_1| + |w_2|)\\) grows linearly away from zero and has a sharp <b>crease along the red axis lines</b> w1 = 0 and w2 = 0. Seen from above at α = 0.5, the contour lines bend toward the axes, and the minimum moves toward zero: w = (${wAt(0.5).map((v) => v.toFixed(2)).join(", ")}).` },
+      { t: "The weak weight becomes exactly zero", cam: ballCam,
+        run: (ann) => { drv.slider("alpha", Math.min(3.5, +(a2 + 0.15).toFixed(2))); if (st.ok) ML.tag(ann, "w2 = 0 exactly", ball.position.clone().add(new THREE.Vector3(0, 0.5, 0)), col.bad, 0.22); },
+        d: () => `From α ≈ ${a2.toFixed(2)} on, the minimum <b>sticks in the crease</b> on the w2 = 0 line: w2 is exactly zero, not just small. Feature 2 no longer contributes to the prediction. This is how Lasso selects features.` },
+      { t: "Larger α shrinks the strong weight too", cam: CAM3,
+        run: () => { drv.slider("alpha", +((a2 + a1) / 2).toFixed(2)); },
+        d: () => `At α = ${((a2 + a1) / 2).toFixed(2)} the minimum slides along the w2 = 0 line toward the origin: w1 = ${wAt((a2 + a1) / 2)[0].toFixed(2)}. Larger α means a simpler model, but it also fits the data worse.` },
+      { t: "Too much regularization: all weights zero", cam: ballCam,
+        run: () => { drv.slider("alpha", Math.min(3.5, +(a1 + 0.2).toFixed(2))); },
+        d: () => `From α ≈ ${a1.toFixed(2)} both weights are zero and the model predicts the mean of y for everyone (the intercept is not penalized). That is too simple. In practice <b>α is chosen with cross-validation</b>; the coefficient path of the real Diabetes data below shows the same story for 10 features.` },
+    ], { title: "How Lasso sets weights exactly to zero" });
+    disposers.push(() => tour.dispose());
+
     // ----- Diabetes coefficient path -----
     const DD = ML.data.extra.diabetes;
     const alphas = Array.from({ length: 90 }, (_, i) => Math.pow(10, 2 - (i / 89) * 4)); // 100 → 0.01

@@ -108,7 +108,7 @@ Final test accuracy: 0.9333333333333333`)}
       const g = root.querySelector("#cv-grid");
       g.style.setProperty("--k", S.K);
       g.innerHTML = Array.from({ length: S.K }, (_, it) => `<div class="kfold-row" style="opacity:${it === S.it ? 1 : 0.55}"><span class="lab">Iteration ${it + 1}</span>${Array.from({ length: S.K }, (_, f) => `<div class="blk ${f === it ? "va" : "tr"}">${S.K <= 6 ? (f === it ? "Validation" : "Training") : f === it ? "V" : "T"}</div>`).join("")}<span class="sc">${it === S.it ? "◀ now" : ""}</span></div>`).join("");
-      info.innerHTML = `Iteration ${S.it + 1} of ${S.K}: train on ${S.K - 1} folds (${Math.round((120 * (S.K - 1)) / S.K)} rows), validate on fold ${S.it + 1} (${Math.round(120 / S.K)} rows). After all ${S.K} iterations, every row has been used for validation exactly once.`;
+      info.innerHTML = S.it < 0 ? `${S.K} folds of about ${Math.round(120 / S.K)} rows each. Press Next iteration to start.` : `Iteration ${S.it + 1} of ${S.K}: train on ${S.K - 1} folds (${Math.round((120 * (S.K - 1)) / S.K)} rows), validate on fold ${S.it + 1} (${Math.round(120 / S.K)} rows). After all ${S.K} iterations, every row has been used for validation exactly once.`;
     }
     const cT = new THREE.Color(col.c[1]), cV = new THREE.Color(col.c[2]), tmp = new THREE.Color(), dm = new THREE.Object3D();
     let lastSwitch = performance.now();
@@ -126,6 +126,28 @@ Final test accuracy: 0.9333333333333333`)}
       });
     }
     layout(); grid();
+
+    // ----- Step-by-step tour -----
+    const cdrv = ML.drive(sp);
+    const GR = ML.data.extra.irisGrid, k3 = GR.folds.map((f) => f[2]);
+    const hold = (K, it) => { S.playing = false; playBtn.textContent = "Play"; if (S.K !== K) cdrv.slider("K (number", K); S.it = it; grid(); };
+    const resume = () => { S.playing = true; playBtn.textContent = "Pause"; };
+    const step = (i) => ({ t: `Iteration ${i + 1}: fold ${i + 1} validates`, cam: [[0, 4.2, 7.6], [0, 0.4, 0]],
+      run: (ann) => { hold(3, i); },
+      d: `The raised yellow block is fold ${i + 1}: it is the <b>validation set</b> this time. The model (here StandardScaler + KNN with k = 3) is trained on the other two folds (teal, 80 rows) and scored on fold ${i + 1}: s<sub>${i + 1}</sub> = <b>${k3[i].toFixed(3)}</b>.` });
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "Only the training set is used", cam: [[0, 4.2, 7.6], [0, 0.4, 0]],
+        run: () => { hold(3, -1); return () => { if (S.it < 0) S.it = 0; }; },
+        d: "These 120 cubes are the Iris <b>training</b> rows. The 30 test rows were set aside by train_test_split and are not touched while choosing a setting such as KNN's k (a <b>hyperparameter</b>)." },
+      step(0), step(1), step(2),
+      { t: "Average the K validation scores", cam: [[0, 4.2, 7.6], [0, 0.4, 0]],
+        run: () => { hold(3, 0); resume(); },
+        d: `Every row was used for validation exactly once. The cross-validation score is the mean: \\(\\bar s = \\frac{1}{3}(${k3.map((v) => v.toFixed(3)).join(" + ")}) = ${GR.mean[2].toFixed(4)}\\). GridSearchCV repeats this for every candidate value of k and keeps the best.` },
+      { t: "More folds: K = 5 or K = 10", cam: [[0, 5, 9.5], [0, 0.4, 0]],
+        run: () => { hold(5, 0); resume(); },
+        d: "With K = 5 each model trains on 96 rows and validates on 24; five scores are averaged. More folds mean more training data per model but more fits. Do not confuse <b>K folds</b> with KNN's <b>k neighbors</b>. After the search, the best setting is refitted on all 120 rows and checked once on the test set." },
+    ], { title: "How K-fold cross-validation works" });
+    disposers.push(() => tour.dispose());
 
     // Grid search plot over n_neighbors.
     const G = ML.data.extra.irisGrid;

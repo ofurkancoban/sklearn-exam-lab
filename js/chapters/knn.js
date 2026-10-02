@@ -197,6 +197,45 @@ Correct:  [0 2 1 1 0]`)}
     }
     plot.drawFn = drawMap;
     drawMap();
-    return () => { st.dispose(); plot.dispose(); };
+    // ----- Step-by-step tour -----
+    const drv = ML.drive(panel);
+    // Pick a test flower whose prediction depends on k (near the versicolor / virginica border).
+    let qi = Xte.findIndex((r, i) => knn(r, 1).pred !== knn(r, 9).pred);
+    if (qi < 0) qi = Xte.findIndex((r, i) => yte[i] === 2);
+    const near = () => qMesh.position.clone();
+    const closeCam = () => { const p = near(); return [[p.x + 2.3, p.y + 1.6, p.z + 2.6], [p.x, p.y, p.z]]; };
+    const hide = (on) => { if (!st.ok) return; [qMesh, glass, glassWire, linkGroup].forEach((m) => (m.visible = on)); };
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "The training data is the model", cam: [[5.2, 3.8, 5.8], [0, 0.1, 0]],
+        run: (ann) => { drv.slider("n_neighbors", 5); drv.slider("Test flower", qi + 1); hide(false); ML.tag(ann, "each sphere = one training flower", ML.P(-1.4, 1.2, 1.8), col.muted, 0.2); return () => hide(true); },
+        d: "Each sphere is one of the <b>120 training flowers</b>, placed by three of its measurements (after StandardScaler) and colored by its known species y. KNN's <code>fit</code> does almost nothing: it simply <b>stores</b> these examples. All the work happens at prediction time." },
+      { t: "A new flower arrives", cam: closeCam,
+        run: (ann) => { [glass, glassWire, linkGroup].forEach((m) => st.ok && (m.visible = false)); ML.tag(ann, "new flower: species = ?", near().add(new THREE.Vector3(0, 0.45, 0)), col.ink); return () => hide(true); },
+        d: () => `The black diamond is test flower #${qi + 1}. We know its measurements but pretend we do not know its species. KNN will look at the training flowers <b>closest</b> to it.` },
+      { t: "Measure the distance to every training flower", cam: closeCam,
+        run: (ann) => {
+          [glass, glassWire, linkGroup].forEach((m) => st.ok && (m.visible = false));
+          if (!st.ok) return () => hide(true);
+          const q = Xte[qi], pairs = Xtr.map((r) => [world(q), world(r)]);
+          ann.add(ML.segments(pairs, new THREE.Color(col.muted), 0.18));
+          const nn = knn(q, 1).nb[0];
+          ML.tag(ann, `nearest: d = ${nn.d.toFixed(2)}`, world(Xtr[nn.i]).add(new THREE.Vector3(0, 0.3, 0)), col.accent, 0.2);
+          return () => hide(true);
+        },
+        d: "KNN computes the Euclidean distance \\(\\sqrt{\\sum_j (x_j - z_j)^2}\\) from the new flower to <b>all 120</b> training flowers (grey lines). This is why predicting gets slow when there are many examples." },
+      { t: "k = 1: the single closest flower decides", cam: closeCam,
+        run: () => { drv.slider("n_neighbors", 1); },
+        d: () => { const r = knn(Xte[qi], 1); return `With k = 1 only the nearest flower votes. The glass sphere's radius is the distance to it. Prediction: <b>${D.names[r.pred]}</b>. One single, possibly unusual flower decides everything: k = 1 reacts strongly to noise.`; } },
+      { t: "k = 5: a small majority vote", cam: closeCam,
+        run: () => { drv.slider("n_neighbors", 5); },
+        d: () => { const r = knn(Xte[qi], 5); return `Now the 5 nearest flowers are inside the sphere and vote: ${r.votes.map((v, c) => `${v} × ${D.names[c]}`).join(", ")}. Prediction: <b>${D.names[r.pred]}</b> (true species: ${D.names[yte[qi]]}). The vote counts are also shown in the panel.`; } },
+      { t: "k = 15: smoother, less sensitive", cam: () => { const p = near(); return [[p.x + 3.6, p.y + 2.6, p.z + 4], [p.x, p.y, p.z]]; },
+        run: () => { drv.slider("n_neighbors", 15); },
+        d: () => { const r = knn(Xte[qi], 15); return `With k = 15 the sphere grows and many more flowers vote: ${r.votes.map((v, c) => `${v} × ${D.names[c]}`).join(", ")} → <b>${D.names[r.pred]}</b>. Larger k <b>smooths</b> the predictions; too large k ignores local structure. The right k is chosen with cross-validation.`; } },
+      { t: "The same rule everywhere: decision regions", cam: [[5.2, 3.8, 5.8], [0, 0.1, 0]],
+        run: () => { drv.slider("n_neighbors", 5); },
+        d: "Repeating this vote for every possible point gives the colored regions in the 2D map below this panel. Try the k slider there: k = 1 creates small islands around single flowers, larger k gives smooth borders. On the 30 test flowers this model scores <b>28 / 30 = 0.933</b>, the same as the script." },
+    ], { title: "How KNN classifies a new flower" });
+    return () => { tour.dispose(); st.dispose(); plot.dispose(); };
   },
 });

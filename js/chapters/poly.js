@@ -84,6 +84,7 @@ plt.show()`, `MAE: 0.7146419232499187`)}
     const host = root.querySelector("#pl-stage"), panel = root.querySelector("#pl-panel");
     const st = new ML.Stage3D(host, { cam: [6.5, 3.6, 6.2], target: [0, 1.4, 0] });
     disposers.push(() => st.dispose());
+    const fitObjs = [];
     if (st.ok) {
       ML.axes(st, { x: [-2.2, 2.2], y: [-1.9, 1.95], z: [-0.8, 3.8], labels: ["feature x", "feature x²", "target y"], div: 6 });
       const G = 24, pos = [], idx = [];
@@ -98,12 +99,16 @@ plt.show()`, `MAE: 0.7146419232499187`)}
       g.setIndex(idx); g.computeVertexNormals();
       const plane = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: col.accent, transparent: true, opacity: 0.26, side: THREE.DoubleSide, depthWrite: false }));
       st.add(plane);
-      st.add(new THREE.LineSegments(new THREE.WireframeGeometry(g), new THREE.LineBasicMaterial({ color: col.accent, transparent: true, opacity: 0.12 })));
+      const wire = new THREE.LineSegments(new THREE.WireframeGeometry(g), new THREE.LineBasicMaterial({ color: col.accent, transparent: true, opacity: 0.12 }));
+      st.add(wire);
+      fitObjs.push(plane, wire);
       // Fitted curve on the plane and its shadow on the floor (the ribbon x² = x·x).
       const curve = [], shadow = [];
       for (let i = 0; i <= 120; i++) { const x = -3 + (6 * i) / 120; curve.push(W(x, x * x, w3[0] + w3[1] * x + w3[2] * x * x)); shadow.push(W(x, x * x, -2.5)); }
-      st.add(ML.line(curve, new THREE.Color(col.ink)));
-      st.add(ML.line(shadow, new THREE.Color(col.muted), { dashed: true }));
+      const curveL = ML.line(curve, new THREE.Color(col.ink)), shadowL = ML.line(shadow, new THREE.Color(col.muted), { dashed: true });
+      st.add(curveL); st.add(shadowL);
+      fitObjs.push(curveL);
+      fitObjs.shadow = shadowL;
       const sph = new ML.Spheres(st, N3, 0.07);
       xs3.forEach((x, i) => sph.set(i, W(x, x * x, ys3[i]), col.c[0]));
       sph.commit();
@@ -117,6 +122,28 @@ plt.show()`, `MAE: 0.7146419232499187`)}
     ML.ui.button(row, "Top", () => st.ok && st.flyTo([0, 10, 0.01], [0, 0, 0]), true);
     panel.append(ML.el("div", { class: "verdict", html: `Least-squares weights: <b>b = ${w3[0].toFixed(2)}</b>, <b>w<sub>1</sub> = ${w3[1].toFixed(2)}</b>, <b>w<sub>2</sub> = ${w3[2].toFixed(2)}</b>. The true pattern is y = x², i.e. b = 0, w<sub>1</sub> = 0, w<sub>2</sub> = 1.` }));
     panel.append(ML.el("div", { class: "ctrl-note", html: "Looking along x² hides the x² axis, so you see y against x: a parabola. Looking along x you see y against x²: a straight line, because y depends linearly on the feature x²." }));
+
+    // ----- Step-by-step tour -----
+    const showFit = (on, shadow = true) => { fitObjs.forEach((o) => (o.visible = on)); if (fitObjs.shadow) fitObjs.shadow.visible = shadow; };
+    const FRONT = [[0.01, 1.4, 9.5], [0, 1.4, 0]], SIDEX = [[9.5, 1.4, 0.01], [0, 1.4, 0]], CAM3 = [[6.5, 3.6, 6.2], [0, 1.4, 0]];
+    const tour = ML.tour(host.parentElement, st, [
+      { t: "One feature, a U-shaped pattern", cam: FRONT,
+        run: () => { showFit(false, false); return () => showFit(true); },
+        d: "Looking straight at the x-y wall you see the usual scatter plot: y = x² + noise. A straight line ŷ = b + w<sub>1</sub>x cannot follow this U shape: it would <b>underfit</b>." },
+      { t: "Create a new feature: x²", cam: CAM3, ms: 8000,
+        run: () => { showFit(false, true); return () => showFit(true); },
+        d: "PolynomialFeatures(degree=2) adds a second column x². Now every example is a point (x, x², y) in 3D. Turning the scene shows that the points lie above a curved path on the floor (dashed): x² is tied to x." },
+      { t: "Against x², the pattern is a straight line", cam: SIDEX,
+        run: () => { showFit(false, false); return () => showFit(true); },
+        d: "Look along the x axis: you now see y against the feature x² alone, and the points form a <b>straight line</b>. The curve in x is a linear relationship in x²." },
+      { t: "Linear regression fits a flat plane", cam: CAM3,
+        run: () => { showFit(true, true); },
+        d: `In the space of the two features (x, x²), the model ŷ = b + w<sub>1</sub>x + w<sub>2</sub>x² is an ordinary <b>flat plane</b>, fitted by LinearRegression exactly as in section 06. Fitted: b = ${w3[0].toFixed(2)}, w<sub>1</sub> = ${w3[1].toFixed(2)}, w<sub>2</sub> = ${w3[2].toFixed(2)} (true: 0, 0, 1).` },
+      { t: "Back in 2D, the plane's line is a parabola", cam: FRONT,
+        run: () => { showFit(true, false); },
+        d: "The black line is where the plane meets the curved path. Looking along x² again collapses it into a <b>curve in x</b>. So polynomial regression is still linear regression: “linear” refers to the weights, not to the shape of the curve. Use the degree explorer below to see under- and overfitting." },
+    ], { title: "Why polynomial regression is still linear" });
+    disposers.push(() => tour.dispose());
 
     // ----- Degree explorer -----
     const P = { deg: 2, n: 100 };

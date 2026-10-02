@@ -211,7 +211,9 @@ ML.ui.slider = (parent, o) => {
   input.addEventListener("input", () => { sync(); o.onInput && o.onInput(get()); });
   sync();
   parent.append(wrap);
-  return { el: wrap, input, get, set: (v, fire = false) => { input.value = toPos(v); sync(); if (fire && o.onInput) o.onInput(get()); } };
+  const set = (v, fire = false) => { input.value = toPos(v); sync(); if (fire && o.onInput) o.onInput(get()); };
+  input.mlSet = (v) => set(v, true);
+  return { el: wrap, input, get, set };
 };
 ML.ui.seg = (parent, o) => {
   let value = o.value;
@@ -224,6 +226,7 @@ ML.ui.seg = (parent, o) => {
     if (fire && o.onChange) o.onChange(v);
   };
   const wrap = ML.el("div", { class: "ctrl" }, [o.label ? ML.el("div", { class: "ctrl-row" }, [ML.el("label", { html: o.label })]) : null, seg, o.note ? ML.el("div", { class: "ctrl-note", html: o.note }) : null]);
+  seg.mlSet = (v) => set(v, true);
   parent.append(wrap);
   return { el: wrap, get: () => value, set };
 };
@@ -736,3 +739,116 @@ ML.formula = (label, tex, note = "", right = "") => `
     <div class="f-body">\\[${tex}\\]</div>
     ${note ? `<div class="f-note">${note}</div>` : ""}
   </div>`;
+
+
+/* ---------------- Step-by-step tours ---------------- */
+// Drive a control panel by visible labels (used by tours).
+ML.drive = (panel) => {
+  const ctrlBy = (label) => [...panel.querySelectorAll(".ctrl")].find((c) => {
+    const l = c.querySelector(".ctrl-row label");
+    return l && l.textContent.trim().toLowerCase().startsWith(label.toLowerCase());
+  });
+  return {
+    slider(label, v) { const c = ctrlBy(label); const i = c && c.querySelector('input[type="range"]'); if (i) i.mlSet(v); },
+    seg(text) { const b = [...panel.querySelectorAll(".seg button")].find((x) => x.textContent.trim() === text); if (b && !b.classList.contains("on")) b.click(); },
+    btn(text) { const b = [...panel.querySelectorAll("button")].find((x) => x.textContent.trim().startsWith(text)); if (b) b.click(); },
+    check(label, v) { const l = [...panel.querySelectorAll("label.check")].find((x) => x.textContent.trim().startsWith(label)); const i = l && l.querySelector("input"); if (i && i.checked !== v) { i.checked = v; i.dispatchEvent(new Event("change")); } },
+  };
+};
+// Thick arrow (cylinder shaft + cone head) drawn on top of the scene.
+ML.arrow = (from, to, color, head = 0.18, radius = 0.025) => {
+  const dir = to.clone().sub(from), len = dir.length();
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true });
+  const hl = Math.min(head, len * 0.4);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, Math.max(len - hl, 0.001), 12), mat);
+  shaft.position.y = (len - hl) / 2;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius * 3, hl, 16), mat);
+  cone.position.y = len - hl / 2;
+  shaft.renderOrder = cone.renderOrder = 12;
+  g.add(shaft, cone);
+  g.position.copy(from);
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  return g;
+};
+// A guided sequence of steps for one 3D stage. Each step: { t, d, cam: [pos, target], run(ann, stage) }.
+ML.tour = (bench, stage, steps, o = {}) => {
+  const col = ML.colors();
+  const box = ML.el("div", { class: "tour" });
+  bench.parentNode.insertBefore(box, bench);
+  const ann = new THREE.Group();
+  ann.renderOrder = 10;
+  if (stage && stage.ok) stage.add(ann);
+  let idx = -1, timer = null, playing = false, stepCleanup = null;
+  const head = ML.el("div", { class: "tour-head" });
+  const text = ML.el("div", { class: "tour-text" });
+  const dots = ML.el("div", { class: "tour-dots" });
+  const prev = ML.el("button", { type: "button", class: "btn ghost", text: "Back" });
+  const next = ML.el("button", { type: "button", class: "btn", text: "Start step by step" });
+  const play = ML.el("button", { type: "button", class: "btn ghost", text: "Auto-play" });
+  const exit = ML.el("button", { type: "button", class: "btn ghost", text: "Explore freely" });
+  const ctr = ML.el("div", { class: "btn-row tour-ctrl" }, [prev, next, play, exit]);
+  box.append(head, text, ctr, dots);
+  steps.forEach((s, i) => dots.append(ML.el("button", { type: "button", class: "tour-dot", "aria-label": `Step ${i + 1}: ${s.t}`, title: s.t, onclick: () => go(i) })));
+  const intro = () => {
+    head.innerHTML = `<span class="tour-badge">Step by step</span><b>${o.title || "Guided tour"}</b><span class="tour-count">${steps.length} steps</span>`;
+    text.innerHTML = `<ol class="tour-list">${steps.map((s) => `<li>${s.t}</li>`).join("")}</ol>`;
+    prev.hidden = true; play.hidden = false; exit.hidden = true;
+    next.textContent = "Start step by step";
+    dots.querySelectorAll(".tour-dot").forEach((d) => d.classList.remove("on", "seen"));
+  };
+  function clearAnn() {
+    if (stepCleanup) { try { stepCleanup(); } catch (e) { console.error(e); } stepCleanup = null; }
+    if (stage && stage.ok) stage.clearGroup(ann);
+  }
+  function go(i) {
+    if (i < 0 || i >= steps.length) return;
+    clearAnn();
+    idx = i;
+    const s = steps[i];
+    head.innerHTML = `<span class="tour-badge">Step ${i + 1} / ${steps.length}</span><b>${s.t}</b>`;
+    try { stepCleanup = s.run ? s.run(ann, stage) || null : null; } catch (e) { console.error(e); }
+    text.innerHTML = typeof s.d === "function" ? s.d() : s.d;
+    ML.typesetLater && ML.typesetLater(text);
+    prev.hidden = false; prev.disabled = i === 0; exit.hidden = false;
+    next.textContent = i === steps.length - 1 ? "Finish" : "Next step";
+    dots.querySelectorAll(".tour-dot").forEach((d, k) => { d.classList.toggle("on", k === i); d.classList.toggle("seen", k < i); });
+    const cam = stage && stage.ok ? (typeof s.cam === "function" ? s.cam() : s.cam) : null;
+    if (cam && stage && stage.ok) stage.flyTo(cam[0], cam[1], s.camMs || 1200);
+    const r = bench.getBoundingClientRect();
+    if (o.scroll !== false && (r.top < 0 || r.top > window.innerHeight * 0.5)) box.scrollIntoView({ block: "start", behavior: ML.reducedMotion() ? "auto" : "smooth" });
+  }
+  const stop = () => { playing = false; clearTimeout(timer); play.textContent = "Auto-play"; };
+  const schedule = () => {
+    clearTimeout(timer);
+    if (!playing) return;
+    const ms = (steps[idx] && steps[idx].ms) || 7000;
+    timer = setTimeout(() => { if (idx < steps.length - 1) { go(idx + 1); schedule(); } else stop(); }, ms);
+  };
+  next.addEventListener("click", () => { if (idx === steps.length - 1) { stop(); clearAnn(); idx = -1; intro(); return; } go(idx + 1); schedule(); });
+  prev.addEventListener("click", () => { go(idx - 1); schedule(); });
+  play.addEventListener("click", () => {
+    if (playing) return stop();
+    playing = true; play.textContent = "Pause";
+    if (idx < 0 || idx === steps.length - 1) go(0);
+    schedule();
+  });
+  exit.addEventListener("click", () => { stop(); clearAnn(); idx = -1; intro(); });
+  intro();
+  return { go, dispose: () => { stop(); clearAnn(); } };
+};
+// Small helper for annotation labels in data coordinates.
+ML.tag = (ann, text, pos, color, h = 0.24) => {
+  const s = ML.label(text, { h, color: color || ML.colors().ink, bg: ML.colors().surface, depthTest: false, order: 20 });
+  s.position.copy(pos);
+  ann.add(s);
+  return s;
+};
+ML.ring = (ann, pos, r, color, flat = true) => {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.08, 8, 40), new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true }));
+  if (flat) m.rotation.x = -Math.PI / 2;
+  m.position.copy(pos);
+  m.renderOrder = 15;
+  ann.add(m);
+  return m;
+};

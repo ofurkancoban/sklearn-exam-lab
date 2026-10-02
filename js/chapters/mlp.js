@@ -178,6 +178,41 @@ print("MLP accuracy:", accuracy_score(y_test, predictions))`, `MLP accuracy: 0.9
     }
     drawR();
 
+    // ----- Step-by-step tour: one ReLU neuron -----
+    const rdrv = ML.drive(rp);
+    const rawPlane = (ann) => {
+      if (!rs.ok) return;
+      const g = new THREE.PlaneGeometry(4, 4, 20, 20); g.rotateX(-Math.PI / 2);
+      const pos = g.attributes.position;
+      for (let v = 0; v < pos.count; v++) pos.setY(v, ML.clamp(RS.b + RS.w1 * pos.getX(v) + RS.w2 * -pos.getZ(v), -2.5, 4.5) * HS);
+      g.computeVertexNormals();
+      ann.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col.warn, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })));
+      ann.add(new THREE.LineSegments(new THREE.WireframeGeometry(g), new THREE.LineBasicMaterial({ color: col.warn, transparent: true, opacity: 0.35 })));
+    };
+    const one = (w1, w2, b) => { rdrv.seg("One neuron"); rdrv.slider("w1", w1); rdrv.slider("w2", w2); rdrv.slider("b (", b); };
+    const RCAM = [[5, 4.2, 5.6], [0, 0.7, 0]];
+    const reTour = ML.tour(rh.parentElement, rs, [
+      { t: "A weighted sum is a tilted plane", cam: [[5.6, 1.2, 5.6], [0, 0.2, 0]],
+        run: (ann) => { one(1, 0.5, 0); if (rs.ok) surf.visible = false; rawPlane(ann); return () => { if (rs.ok) surf.visible = true; }; },
+        d: "Before the activation, a neuron computes \\(z = b + w_1x_1 + w_2x_2\\). Over the input plane this is a <b>tilted plane</b> (orange): positive on one side, negative on the other, like linear regression." },
+      { t: "ReLU sets every negative value to 0", cam: RCAM,
+        run: (ann) => { one(1, 0.5, 0); rawPlane(ann); },
+        d: "ReLU keeps positive values and replaces negative ones by 0: \\(h = \\max(0, z)\\). The part of the orange plane below the floor is cut off and laid flat (grey). The result is a <b>folded plane</b>: the first source of nonlinearity." },
+      { t: "The offset b moves the fold", cam: [[0.01, 7.5, 0.5], [0, 0, 0]],
+        run: () => { one(1, 0.5, 1); },
+        d: "The fold lies on the line b + w·x = 0 (dashed). With b = 1 instead of 0 the fold shifts, so more of the input space is active. The offset b decides <b>where</b> the neuron switches on." },
+      { t: "The weights turn and tilt it", cam: RCAM,
+        run: () => { one(-0.3, 1.5, 0); },
+        d: "Weights w1 = −0.3 and w2 = 1.5: the neuron now reacts mainly to x2 and the active part rises steeply. Training adjusts exactly these numbers for thousands of neurons." },
+      { t: "Two folds make a ridge", cam: RCAM,
+        run: () => { rdrv.seg("Several combined"); rdrv.seg("Ridge"); },
+        d: "The next layer adds up neuron outputs with its own weights. Two opposite folds, subtracted from a constant, give a <b>ridge</b>: a shape no single linear model can make." },
+      { t: "Four folds make a bump", cam: RCAM,
+        run: () => { rdrv.seg("Several combined"); rdrv.seg("Pyramid"); },
+        d: "Four neurons carve a pyramid-shaped bump. With enough neurons and layers, sums of such pieces can approximate very complex decision surfaces. That is why hidden layers let an MLP learn nonlinear patterns." },
+    ], { title: "What one ReLU neuron computes" });
+    disposers.push(() => reTour.dispose());
+
     // ----- Network on Iris -----
     const D = ML.data.iris, sp = ML.data.extra.irisSplit;
     const Xtr0 = sp.train.map((i) => D.X[i]), ytr0 = sp.train.map((i) => D.y[i]);
@@ -303,6 +338,32 @@ print("MLP accuracy:", accuracy_score(y_test, predictions))`, `MLP accuracy: 0.9
     raf = requestAnimationFrame(loop);
     disposers.push(() => cancelAnimationFrame(raf));
     reset();
+
+    // ----- Step-by-step tour: the network -----
+    const ndrv = ML.drive(np);
+    const trainNow = () => { N.running = false; while (N.epoch < 300) { net.step(Xt, yt, 0.01); N.epoch++; } trainBtn.textContent = "Train again from scratch"; record(); paint(); drawCurve(); };
+    const layerX = (l) => nodes[l][0].x;
+    const nnTour = ML.tour(nh.parentElement, ns, [
+      { t: "Layers: 4 inputs, 20 hidden neurons, 3 outputs", cam: [[0.5, 1.6, 8.6], [0, 0.2, 0]],
+        run: (ann) => {
+          ndrv.seg("(20,)"); reset();
+          if (ns.ok) { ML.tag(ann, "x: 4 measurements", new THREE.Vector3(layerX(0), -2.4, 0), col.ink, 0.24); ML.tag(ann, "hidden_layer_sizes=(20,)", new THREE.Vector3(layerX(1), -2.9, 0), col.accent, 0.24); ML.tag(ann, "3 species", new THREE.Vector3(layerX(2), -2.4, 0), col.ink, 0.24); }
+        },
+        d: "MLPClassifier with <code>hidden_layer_sizes=(20,)</code>: the input layer has one node per feature (4), the output layer one node per class (3). Only the hidden layer is set by you. Every line is one weight." },
+      { t: "Before training: random weights", cam: [[2.5, 2.2, 7], [0, 0.2, 0]],
+        run: () => { if (N.epoch > 0) { ndrv.seg("(20,)"); reset(); } },
+        d: "Weights start random (teal positive, orange negative). Pass a flower through: each hidden neuron computes max(0, b + Σwx) of the 4 inputs; the 3 outputs go through softmax and become probabilities. Untrained, they are close to a guess (see the bars)." },
+      { t: "Training: backpropagation adjusts the weights", cam: [[0.5, 1.6, 8.6], [0, 0.2, 0]], ms: 9000,
+        run: () => { if (N.epoch >= 300) { ndrv.seg("(20,)"); reset(); } N.running = true; trainBtn.textContent = "Pause"; },
+        d: "Press play on learning: each iteration computes the loss on the training flowers, sends the error backwards through the network (backpropagation) and nudges every weight downhill (Adam optimizer). Watch the line colors change and the <b>loss curve</b> below the scene fall." },
+      { t: "Trained: confident, correct outputs", cam: [[-3.5, 2, 7.5], [1, 0.2, 0]],
+        run: () => { trainNow(); },
+        d: () => `After 300 iterations the output for this flower is (${net.forward(Xte[N.flower]).at(-1).map((v) => v.toFixed(2)).join(", ")}). Validation accuracy ${net.acc(Xv, yv).toFixed(3)}; on the 30 untouched test flowers <b>${net.acc(Xte, yte).toFixed(3)}</b>. The script's scikit-learn model reaches 0.967.` },
+      { t: "Bigger network: (50, 20)", cam: [[0.5, 2, 11], [0, 0.2, 0]],
+        run: () => { ndrv.seg("(50, 20)"); trainNow(); },
+        d: () => `Two hidden layers with 50 and 20 neurons: ${4 * 50 + 50 * 20 + 20 * 3} weights instead of ${4 * 20 + 20 * 3}. More capacity for complex patterns, but more computation and a higher risk of <b>overfitting</b>. Test accuracy here: ${net.acc(Xte, yte).toFixed(3)}. Compare models with cross-validation and use validation data for early stopping.` },
+    ], { title: "How an MLP learns" });
+    disposers.push(() => nnTour.dispose());
     return disposers;
   },
 });

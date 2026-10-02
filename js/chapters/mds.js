@@ -193,6 +193,38 @@ plt.show()`, "")}
     raf = requestAnimationFrame(loop);
     disposers.push(() => cancelAnimationFrame(raf));
     load();
+
+    // ----- Step-by-step tour -----
+    const drv = ML.drive(panel);
+    const pause = () => { S.running = false; runBtn.textContent = "Continue"; };
+    const converge = () => { pause(); for (let k = 0; k < 400; k++) { Z = ML.smacofStep(D, Z); S.it++; } stressHist = []; drawAll(); };
+    const P3 = (x) => ML.P(x[0], x[1], (x[2] || 0) + (S.ds === "dome" ? 0 : 1.2));
+    const stress = () => ML.mdsStress(D, Z);
+    const pcaStress = () => panel.querySelectorAll(".stat b")[2].textContent;
+    const tour = ML.tour(host.closest(".two-col"), st, [
+      { t: "Points in the original space", cam: [[4.4, 3.6, 4.8], [0, 0.6, 0]],
+        run: (ann) => {
+          drv.seg("Dome"); initZ(1); pause(); hov = -1; drawAll();
+          if (st.ok) { const X = DS.dome.X; ann.add(ML.segments(X.slice(1).map((x) => [P3(X[0]), P3(x)]), new THREE.Color(col.accent), 0.35)); ML.tag(ann, "d₁ⱼ to all others", P3(X[0]).add(new THREE.Vector3(0, 0.4, 0)), col.accent, 0.2); }
+        },
+        d: "90 points on a dome in 3D (left). MDS only needs the <b>distances d<sub>ij</sub> between every pair</b> of points; the lines show them for one point. There are 90 · 89 / 2 = 4005 such pairs." },
+      { t: "Start from a random 2D map", cam: [[4.4, 3.6, 4.8], [0, 0.6, 0]],
+        run: () => { drv.seg("Dome"); initZ(1); pause(); hov = -1; drawAll(); },
+        d: () => `MDS places each point at a random position on a 2D map (right). The map distances d̂<sub>ij</sub> have nothing to do with the original ones yet, so the raw stress \\(\\sum_{i \\lt j}(d_{ij} - \\hat d_{ij})^2\\) is huge: <b>${stress().toFixed(0)}</b>. In the Shepard plot below, the dots are far from the diagonal.` },
+      { t: "Move points to reduce the stress", cam: [[4.4, 3.6, 4.8], [0, 0.6, 0]], ms: 9000,
+        run: () => { if (S.it > 20) { initZ(1); } S.running = true; runBtn.textContent = "Pause"; },
+        d: "Each iteration (SMACOF, the algorithm scikit-learn uses) moves every point so that its map distances get closer to its original distances. Watch the map unfold on the right and the Shepard dots gather around the diagonal." },
+      { t: "The final map", cam: [[0.01, 6, 0.5], [0, 0.6, 0]],
+        run: () => { converge(); },
+        d: () => `After convergence the map looks like the dome seen from above (left camera). Raw stress: <b>${stress().toFixed(1)}</b>, lower than the PCA projection's ${pcaStress()}. It cannot reach zero: a curved dome cannot be flattened without some distortion.` },
+      { t: "Where is the distortion?", cam: [[4.4, 3.6, 4.8], [0, 0.6, 0]],
+        run: (ann) => { if (S.it < 50) converge(); hov = DS.dome.y.indexOf(2); drawAll(); },
+        d: "One point near the top of the dome is highlighted (ringed in 3D, enlarged on the map). Lines to all other points on the map are <b>red</b> when that pair is stretched and <b>teal</b> when squeezed compared to the original distance. Hover any point on the map to inspect it yourself." },
+      { t: "Groups stay groups", cam: [[4.4, 3.6, 4.8], [0, 1, 0]],
+        run: () => { hov = -1; drv.seg("3 groups"); converge(); },
+        d: () => `Three separated groups in 3D. Their distances can be kept almost perfectly in 2D (stress ${stress().toFixed(1)}), so the map shows the same three groups. MDS learns <b>positions of the fitted examples</b>, not axes: it has fit_transform but no transform for new points.` },
+    ], { title: "How MDS builds a distance-preserving map" });
+    disposers.push(() => tour.dispose());
     return disposers;
   },
 });
