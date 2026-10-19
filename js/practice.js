@@ -177,7 +177,7 @@ ML.register("exam", {
         const keys = Object.keys(ex.ans);
         const inputs = {};
         const codeHtml = ML.highlight(ex.code).replace(/__(b\d+)__/g, (_, k) => {
-          const w = Math.max(ex.ans[k].length, 6);
+          const w = Math.max(ex.ans[k].length + 2.5, 8);
           inputs[k] = null;
           return `<input class="blank" data-k="${k}" style="width:${w}ch" autocomplete="off" spellcheck="false" aria-label="blank ${k}">`;
         });
