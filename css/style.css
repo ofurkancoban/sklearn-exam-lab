@@ -276,6 +276,13 @@ select, input[type="text"], input[type="number"] {
 .code .out { border-top: 1px solid var(--line); background: var(--surface); }
 .code .out pre { color: var(--muted); }
 .code .out .code-head { border-bottom: 0; padding-bottom: 0; }
+.blank {
+  font: 600 13.5px/1.6 var(--f-mono); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 0; border-bottom: 2px solid var(--accent); border-radius: 3px 3px 0 0; padding: 0 3px; margin: 0 1px; min-width: 6ch;
+}
+.blank:focus { outline: none; background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.blank.ok { color: var(--good); border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.blank.no { color: var(--bad); border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
 .tok-k { color: #b42f88; }
 .tok-s { color: #1d7d43; }
 .tok-n { color: #b35b00; }

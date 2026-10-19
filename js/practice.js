@@ -70,13 +70,13 @@ ML.quiz = {
 
 ML.register("exam", {
   html: (m) => String.raw`
-  ${ML.chHead(m, "Practice like the exam. <b>Review</b> brings back the questions you got wrong; the <b>mock exam</b> is timed and scored per section; <b>drills</b> generate fresh numbers every time.", ["all sections"])}
+  ${ML.chHead(m, "Practice like the exam. <b>Review</b> brings back the questions you got wrong; <b>fill-in-the-blank code</b> drills the exact question type Oliver named in the exam announcement; the <b>mock exam</b> is timed and scored per section; <b>drills</b> generate fresh numbers every time.", ["all sections"])}
   <div class="tabs" id="ex-modes" role="tablist" aria-label="Practice mode"></div>
   <div id="ex-body" style="display:grid;gap:16px"></div>
   `,
   init(root) {
     const modesEl = root.querySelector("#ex-modes"), body = root.querySelector("#ex-body");
-    const MODES = [["review", "Review (spaced)"], ["quiz", "Practice quiz"], ["mock", "Mock exam"], ["drill", "Calculations"], ["cards", "Flashcards"], ["progress", "My progress"]];
+    const MODES = [["review", "Review (spaced)"], ["quiz", "Practice quiz"], ["fillcode", "Fill-in-the-blank code"], ["mock", "Mock exam"], ["drill", "Calculations"], ["cards", "Flashcards"], ["progress", "My progress"]];
     let mode = ML.store.get("mlsite-exmode", "review"), seed = Date.now() % 100000, timer = null, preset = null;
     const tabs = MODES.map(([v, t]) => {
       const b = ML.el("button", { type: "button", class: "tab", role: "tab", text: t, onclick: () => go(v) });
@@ -89,7 +89,7 @@ ML.register("exam", {
       tabs.forEach(([k, b]) => { b.classList.toggle("on", k === v); b.setAttribute("aria-selected", k === v); });
       clearInterval(timer);
       body.innerHTML = "";
-      ({ review, quiz, mock, drill, cards, progress })[v]();
+      ({ review, quiz, fillcode, mock, drill, cards, progress })[v]();
       window.scrollTo(0, 0);
     }
     const scriptQs = () => ML.questions.filter((q) => q.ch !== "extras");
@@ -157,6 +157,75 @@ ML.register("exam", {
       };
       sel.addEventListener("change", start); typ.addEventListener("change", start);
       start();
+    }
+
+    // ---------- Fill-in-the-blank code ----------
+    function fillcode() {
+      body.append(ML.el("p", { class: "fig-cap", html: "Every blank (<code>____</code>) has exactly one intended answer: a scikit-learn class, method or argument, taken from the script's own code. Type into the blanks, then <b>Check</b> or <b>Reveal</b>." }));
+      const scoreEl = ML.el("div", { class: "verdict num" });
+      body.append(scoreEl);
+      const list = ML.el("div", { class: "quiz" });
+      body.append(list);
+      const results = new Map();
+      const updTotal = () => {
+        if (!results.size) { scoreEl.innerHTML = "Answer any exercise below to see your running score."; return; }
+        let r = 0, n = 0;
+        results.forEach((v) => { r += v.right; n += v.total; });
+        scoreEl.innerHTML = `Running score: <b>${r} / ${n}</b> blanks correct across ${results.size} / ${ML.fillcode.length} exercises checked.`;
+      };
+      ML.fillcode.forEach((ex, idx) => {
+        const keys = Object.keys(ex.ans);
+        const inputs = {};
+        const codeHtml = ML.highlight(ex.code).replace(/__(b\d+)__/g, (_, k) => {
+          const w = Math.max(ex.ans[k].length, 6);
+          inputs[k] = null;
+          return `<input class="blank" data-k="${k}" style="width:${w}ch" autocomplete="off" spellcheck="false" aria-label="blank ${k}">`;
+        });
+        const pre = ML.el("pre", { class: "py", html: codeHtml });
+        const res = ML.el("div");
+        const card = ML.el("div", { class: "q-card" }, [
+          ML.el("div", { class: "q-meta" }, [ML.el("span", { text: `${idx + 1}. ${ex.title}` }), ML.el("span", { text: `${ex.pts} pts · ${chTitle(ex.ch)}` })]),
+          ML.el("div", { class: "code" }, [pre]),
+          ML.el("div", { class: "btn-row" }, [
+            ML.el("button", { type: "button", class: "btn", text: "Check" }),
+            ML.el("button", { type: "button", class: "btn ghost", text: "Reveal" }),
+            ML.el("button", { type: "button", class: "btn ghost", text: "Clear" }),
+          ]),
+          res,
+        ]);
+        pre.querySelectorAll(".blank").forEach((inp) => { inputs[inp.dataset.k] = inp; });
+        const [checkBtn, revealBtn, clearBtn] = card.querySelectorAll(".btn-row button");
+        const check = () => {
+          let right = 0;
+          keys.forEach((k) => {
+            const inp = inputs[k];
+            const ok = inp.value.trim().toLowerCase() === ex.ans[k].toLowerCase();
+            inp.classList.remove("ok", "no");
+            inp.classList.add(ok ? "ok" : "no");
+            if (ok) right++;
+          });
+          results.set(idx, { right, total: keys.length });
+          res.innerHTML = `<div class="q-explain"><b class="${right === keys.length ? "ok" : "no"}">${right} / ${keys.length} correct.</b></div>`;
+          updTotal();
+        };
+        const reveal = () => {
+          keys.forEach((k) => { inputs[k].value = ex.ans[k]; inputs[k].classList.remove("no"); inputs[k].classList.add("ok"); });
+          results.set(idx, { right: keys.length, total: keys.length });
+          res.innerHTML = `<div class="q-explain">Answers revealed.</div>`;
+          updTotal();
+        };
+        const clear = () => {
+          keys.forEach((k) => { inputs[k].value = ""; inputs[k].classList.remove("ok", "no"); });
+          results.delete(idx);
+          res.innerHTML = "";
+          updTotal();
+        };
+        checkBtn.addEventListener("click", check);
+        revealBtn.addEventListener("click", reveal);
+        clearBtn.addEventListener("click", clear);
+        pre.querySelectorAll(".blank").forEach((inp) => inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(); }));
+        list.append(card);
+      });
     }
 
     // ---------- Mock exam ----------
