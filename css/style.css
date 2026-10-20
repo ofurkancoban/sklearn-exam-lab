@@ -502,3 +502,8 @@ kbd { font: 600 12px var(--f-mono); border: 1px solid var(--line); border-bottom
 .tour:has(+ .bench) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 :root[data-theme="dark"] .tour-badge { color: #0d1317; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tour-badge { color: #0d1317; } }
+
+/* ---------- Visitor counter ---------- */
+.visitors { padding: 0 8px; font-size: 12px; color: var(--muted); display: flex; align-items: baseline; gap: 5px; }
+.visitors b { font: 600 13px var(--f-mono); color: var(--ink); }
+.visitors::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); align-self: center; }

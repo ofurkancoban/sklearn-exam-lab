@@ -239,6 +239,22 @@
     else if (e.key === "g") location.hash = "exam";
   });
 
+  // ---------- Unique visitor counter ----------
+  // Each browser increments the shared counter once; later visits only read it.
+  (() => {
+    const API = "https://abacus.jasoncameron.dev", NS = "ofurkancoban-sklearn-exam-lab", KEY = "unique-visitors";
+    let counted = false;
+    try { counted = localStorage.getItem("mlsite-counted") === "1"; } catch (e) {}
+    const url = `${API}/${counted ? "get" : "hit"}/${NS}/${KEY}`;
+    fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status))).then((d) => {
+      if (typeof d.value !== "number") return;
+      if (!counted) { try { localStorage.setItem("mlsite-counted", "1"); } catch (e) {} }
+      document.getElementById("visitors-n").textContent = d.value.toLocaleString("en-US");
+      document.getElementById("visitors-label").textContent = d.value === 1 ? "unique visitor" : "unique visitors";
+      document.getElementById("visitors").hidden = false;
+    }).catch(() => {});
+  })();
+
   buildNav();
   window.addEventListener("hashchange", route);
   const start = () => route();

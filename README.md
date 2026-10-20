@@ -1,5 +1,7 @@
 # sklearn.lab: Scikit-Learn Exam Lab
 
+[![unique visitors](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fofurkancoban-sklearn-exam-lab%2Funique-visitors&query=%24.value&label=unique%20visitors&color=2b55c9&cacheSeconds=300)](https://ofurkancoban.github.io/sklearn-exam-lab/)
+
 An interactive study site for the course script **"Machine Learning with Scikit-Learn: A Little Mathematics"** (Oliver Kramer). Every method from the script has a 3D model you can rotate and change, the key formulas, the scikit-learn code with its real output, typical exam traps and practice questions.
 
 **Live site:** https://ofurkancoban.github.io/sklearn-exam-lab/
@@ -69,6 +71,10 @@ js/questions2.js      scenario, code-reading and extra questions
 js/practice.js        quiz engine, spaced repetition, mock exam, progress
 js/exercises.js       exercise solutions with real outputs
 ```
+
+## Visitor counter
+
+The badge above and the number in the site's sidebar show **unique visitors of the live site**, stored in an [Abacus](https://jasoncameron.dev/abacus/) counter. The site increments it once per browser (a flag in localStorage marks a browser as counted) and only reads it on later visits; the README badge only reads it. A visitor using a new device, a private window or cleared site data is counted again, so the number is an approximation. No personal data is sent.
 
 ## Tech
 
