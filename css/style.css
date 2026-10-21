@@ -505,6 +505,7 @@ kbd { font: 600 12px var(--f-mono); border: 1px solid var(--line); border-bottom
 
 /* ---------- Visitor counter ---------- */
 .visitors { padding: 0 8px; font-size: 12px; color: var(--muted); display: flex; align-items: baseline; gap: 5px; }
+.visitors[hidden] { display: none; }
 .visitors b { font: 600 13px var(--f-mono); color: var(--ink); }
 .visitors::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); align-self: center; }
 
