@@ -146,7 +146,7 @@
   };
 
   /* Safe Markdown for AI answers: escapes HTML, keeps TeX (\( \), \[ \], $ $, $$ $$) intact for MathJax,
-   * and supports headings, bold, italics, inline code, code blocks, bullet and numbered lists, tables as text, paragraphs. */
+   * and supports headings, bold, italics, inline code, code blocks, bullet and numbered lists, tables, paragraphs. */
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   function renderMD(src) {
     const math = [];
@@ -162,11 +162,22 @@
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
       .replace(/__([^_]+)__/g, "<strong>$1</strong>")
       .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, "$1<em>$2</em>");
-    const out = []; let list = null, para = [];
+    const out = []; let list = null, para = [], table = [];
+    const cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+    const flushTable = () => {
+      if (!table.length) return;
+      const rows = table.filter((r) => !/^\s*\|?\s*:?-{2,}/.test(r)), hasHead = table.length > 1 && /^\s*\|?\s*:?-{2,}/.test(table[1]);
+      const head = hasHead ? rows.shift() : null;
+      out.push('<div class="md-table"><table>' + (head ? "<thead><tr>" + cells(head).map((c) => "<th>" + inline(c) + "</th>").join("") + "</tr></thead>" : "") +
+        "<tbody>" + rows.map((r) => "<tr>" + cells(r).map((c) => "<td>" + inline(c) + "</td>").join("") + "</tr>").join("") + "</tbody></table></div>");
+      table = [];
+    };
     const flushPara = () => { if (para.length) { out.push("<p>" + para.map(inline).join("<br>") + "</p>"); para = []; } };
     const flushList = () => { if (list) { out.push("<" + list.tag + ">" + list.items.map((i) => "<li>" + i.map(inline).join("<br>") + "</li>").join("") + "</" + list.tag + ">"); list = null; } };
     t.split("\n").forEach((line) => {
       const h = /^\s{0,3}(#{1,6})\s+(.*)$/.exec(line), ul = /^\s*[-*•]\s+(.*)$/.exec(line), ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+      if (/^\s*\|.*\|\s*$/.test(line)) { flushPara(); flushList(); table.push(line); return; }
+      flushTable();
       if (!line.trim()) { flushPara(); flushList(); return; }
       if (/^\s*(---|\*\*\*|___)\s*$/.test(line)) { flushPara(); flushList(); out.push("<hr>"); return; }
       if (h) { flushPara(); flushList(); out.push('<p class="md-h">' + inline(h[2]) + "</p>"); return; }
@@ -178,7 +189,7 @@
       if (list && /^\s{2,}\S/.test(line)) { list.items[list.items.length - 1].push(line.trim()); return; }
       flushList(); para.push(line);
     });
-    flushPara(); flushList();
+    flushTable(); flushPara(); flushList();
     return out.join("").replace(/\u0000(\d+)\u0000/g, (m, i) => math[+i]);
   }
 

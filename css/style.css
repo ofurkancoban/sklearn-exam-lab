@@ -573,3 +573,7 @@ kbd { font: 600 12px var(--f-mono); border: 1px solid var(--line); border-bottom
   .ai-fab span { display: none; }
 }
 @media print { .ai-fab, .ai-panel { display: none !important; } }
+.ai-a .md-table { overflow-x: auto; margin: 6px 0 8px; }
+.ai-a .md-table table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.ai-a .md-table th, .ai-a .md-table td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+.ai-a .md-table th { background: var(--surface); font-weight: 600; }
