@@ -32,6 +32,14 @@ Every 3D model comes with a **step-by-step tour**: the camera flies to the relev
 | Beyond the script | Optional topics from the long lecture notes: entropy, softmax, min-max scaling, OLS and gradient descent, MAPE, Wilcoxon test |
 | Exam practice | Spaced-repetition review, filtered practice quiz, 30-minute mock exam, calculation drills, flashcards, progress dashboard |
 
+## AI tutor
+
+The **Ask AI** button (bottom right, or press `a`) opens a chat tutor that reads the section on screen, so its answers follow the script's notation. Answers stream in and render Markdown, code and formulas. After answering a quiz question, **Explain with AI** asks the tutor why the right answer is right and why your pick was wrong.
+
+By default the tutor uses a **free, open-weight model** (GPT-OSS 20B, Apache 2.0 licence) served by [Pollinations](https://pollinations.ai), with no account and no key. The free tier answers about once every 30 seconds per connection; the question and the section text are sent to Pollinations. In the settings (gear icon) you can switch to Anthropic, OpenAI, Google Gemini or any OpenAI-compatible server (OpenRouter, Ollama, LM Studio). API keys are stored only in your browser and sent only to the provider you pick.
+
+Note: the free model refuses pages served from `localhost`; when running locally, open http://127.0.0.1:8765 instead.
+
 ## Accuracy
 
 All datasets (Iris, Wine, Diabetes, Two Moons) were exported from scikit-learn, and every code output shown on the site comes from running the script's code with scikit-learn 1.9. The in-browser algorithms reproduce scikit-learn's results, for example DBSCAN on the script's moons sample (19 / 2 / 1 clusters for eps = 0.1 / 0.25 / 0.5) and PCA's explained variance on Iris (73.0% / 22.9%).
@@ -44,7 +52,7 @@ No build step. Serve the folder with any static server:
 python3 -m http.server 8765
 ```
 
-Then open http://localhost:8765. An internet connection is needed for three.js, MathJax and Google Fonts (loaded from CDNs).
+Then open http://127.0.0.1:8765 (use 127.0.0.1 rather than localhost so the free AI tutor answers). An internet connection is needed for three.js, MathJax and Google Fonts (loaded from CDNs).
 
 ## Keyboard shortcuts
 
@@ -54,6 +62,7 @@ Then open http://localhost:8765. An internet connection is needed for three.js, 
 | `←` `→` or `[` `]` | Previous / next section |
 | `m` | Mark the section as studied |
 | `g` | Go to Exam practice |
+| `a` | Open or close the AI tutor |
 | `?` | Show shortcuts |
 
 ## Project structure
@@ -65,6 +74,7 @@ css/style.css         design tokens (light and dark), layout, components
 js/core.js            helpers: Three.js stage, 2D plots, UI controls, math
 js/data.js            datasets and precomputed scikit-learn results
 js/app.js             router, navigation, search, shortcuts, theme
+js/ai.js              AI tutor: chat panel, providers, streaming, Explain with AI
 js/chapters/*.js      one file per section (content + interactive models)
 js/quiz.js            concept questions and calculation drills
 js/questions2.js      scenario, code-reading and extra questions
@@ -78,7 +88,7 @@ The badge above and the number in the site's sidebar show **unique visitors of t
 
 ## Tech
 
-Plain HTML, CSS and JavaScript, [three.js](https://threejs.org/) r147 for 3D, [MathJax](https://www.mathjax.org/) for formulas. Progress and quiz history are stored in the browser's localStorage only.
+Plain HTML, CSS and JavaScript, [three.js](https://threejs.org/) r147 for 3D, [MathJax](https://www.mathjax.org/) for formulas. The AI tutor talks to the chosen provider directly from the browser. Progress and quiz history are stored in the browser's localStorage only.
 
 ## Note
 

@@ -48,6 +48,7 @@ ML.quiz = {
       btns[q.a].classList.add("right");
       if (i !== q.a) b.classList.add("wrong");
       c.append(ML.el("div", { class: "q-explain", html: `<b class="${i === q.a ? "ok" : "no"}">${i === q.a ? "Correct." : `Not quite. Answer: ${"ABCD"[q.a]}.`}</b> ${q.why}` }));
+      if (ML.ai) c.append(ML.ai.explainButton(q, i));
       ML.qstats.record(q, i === q.a);
       onAnswer && onAnswer(i === q.a);
     }));
@@ -308,6 +309,7 @@ ML.register("exam", {
           card._btns[x.q.a].classList.add("right");
           if (x.choice !== null && x.choice !== x.q.a) card._btns[x.choice].classList.add("wrong");
           card.append(ML.el("div", { class: "q-explain", html: `<b class="${x.choice === x.q.a ? "ok" : "no"}">${x.choice === x.q.a ? "Correct." : x.choice === null ? "Not answered." : "Wrong."}</b> ${x.q.why}` }));
+          if (ML.ai) card.append(ML.ai.explainButton(x.q, x.choice));
           rl.append(card);
         });
         drills.forEach((x, i) => rl.append(ML.el("div", { class: "q-card" }, [
